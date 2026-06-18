@@ -1,0 +1,860 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Dashboard de negocio en tres bloques: KPIs, drivers y detalles operacionales con alertas y filtros."
+    />
+    <title>Mantoniowolf Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <style>
+      :root {
+        --ink: #1f2432;
+        --muted: #617089;
+        --bg-1: #fbf7ef;
+        --bg-2: #e8f6f5;
+        --bg-3: #f0f5ff;
+        --line: rgba(31, 36, 50, 0.14);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        font-family: "Manrope", "Avenir Next", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at 10% 16%, var(--bg-2) 0, transparent 26%),
+          radial-gradient(circle at 92% 6%, #ffe8c8 0, transparent 24%),
+          radial-gradient(circle at 45% 100%, var(--bg-3) 0, transparent 35%),
+          linear-gradient(165deg, #fbfcff 0%, var(--bg-1) 55%, #f7fff7 100%);
+        min-height: 100vh;
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      .skip-link {
+        position: absolute;
+        top: -200px;
+        left: 0.75rem;
+        z-index: 30;
+        border-radius: 0.75rem;
+        background: #0f172a;
+        color: #fff;
+        font-size: 0.875rem;
+        font-weight: 700;
+        padding: 0.5rem 0.875rem;
+      }
+
+      .skip-link:focus {
+        top: 0.75rem;
+      }
+
+      .grain {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.16;
+        background-image: radial-gradient(#000 0.45px, transparent 0.45px);
+        background-size: 3px 3px;
+        z-index: 0;
+      }
+
+      .card {
+        border-radius: 1rem;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(6px);
+        box-shadow: 0 14px 26px rgba(31, 36, 50, 0.08);
+      }
+
+      .kpi-card {
+        opacity: 0;
+        transform: translateY(10px);
+        animation: rise 520ms ease forwards;
+      }
+
+      .kpi-card:nth-child(2) {
+        animation-delay: 60ms;
+      }
+      .kpi-card:nth-child(3) {
+        animation-delay: 120ms;
+      }
+      .kpi-card:nth-child(4) {
+        animation-delay: 180ms;
+      }
+      .kpi-card:nth-child(5) {
+        animation-delay: 240ms;
+      }
+      .kpi-card:nth-child(6) {
+        animation-delay: 300ms;
+      }
+      .kpi-card:nth-child(7) {
+        animation-delay: 360ms;
+      }
+      .kpi-card:nth-child(8) {
+        animation-delay: 420ms;
+      }
+
+      @keyframes rise {
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      canvas {
+        max-height: 320px;
+      }
+
+      .alert-high {
+        border-color: rgba(220, 38, 38, 0.2);
+        background: rgba(254, 242, 242, 0.9);
+      }
+
+      .alert-medium {
+        border-color: rgba(217, 119, 6, 0.2);
+        background: rgba(255, 251, 235, 0.9);
+      }
+
+      .alert-positive {
+        border-color: rgba(5, 150, 105, 0.2);
+        background: rgba(236, 253, 245, 0.9);
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#contenido-principal">Saltar al contenido principal</a>
+    <div class="grain" aria-hidden="true"></div>
+
+    <header class="relative z-10 border-b border-slate-900/10 bg-white/45">
+      <div class="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-7 md:flex-row md:items-center md:justify-between md:px-8">
+        <div>
+          <p class="text-xs font-bold uppercase tracking-[0.22em] text-slate-600">Business Performance Dashboard</p>
+          <h1 class="text-2xl font-black tracking-tight md:text-4xl">
+            Mantoniowolf <span class="text-emerald-700">Command Center</span>
+          </h1>
+          <p class="mt-1 text-sm text-slate-600 md:text-base">
+            Productos A (50 EUR), B (120 EUR), C (80 EUR) | Comision del 15%
+          </p>
+        </div>
+        <nav class="text-xs font-semibold md:text-sm" aria-label="Bloques del dashboard">
+          <ul class="flex flex-col gap-2 sm:flex-row">
+            <li>
+              <a class="block w-full rounded-full bg-slate-900 px-4 py-2 text-center text-white sm:w-auto" href="#bloque-kpi">Bloque 1 KPI</a>
+            </li>
+            <li>
+              <a class="block w-full rounded-full bg-white px-4 py-2 text-center text-slate-700 ring-1 ring-slate-200 sm:w-auto" href="#bloque-drivers">Bloque 2 Drivers</a>
+            </li>
+            <li>
+              <a class="block w-full rounded-full bg-white px-4 py-2 text-center text-slate-700 ring-1 ring-slate-200 sm:w-auto" href="#bloque-operacional">Bloque 3 Operacion</a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <main id="contenido-principal" class="relative z-10 mx-auto max-w-7xl px-4 py-8 md:px-8 md:py-10">
+      <section id="bloque-kpi" aria-labelledby="titulo-kpi">
+        <div class="mb-4">
+          <h2 id="titulo-kpi" class="text-xl font-black md:text-2xl">Bloque 1 superior: Indicadores principales del resultado (KPI)</h2>
+          <p class="mt-1 text-sm text-slate-700 md:text-base">
+            Vista ejecutiva de volumen, ingresos, engagement, retencion, rendimiento, satisfaccion y eficiencia.
+          </p>
+        </div>
+
+        <div id="kpiGrid" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"></div>
+      </section>
+
+      <section id="bloque-drivers" class="mt-8" aria-labelledby="titulo-drivers">
+        <div class="mb-4">
+          <h2 id="titulo-drivers" class="text-xl font-black md:text-2xl">Bloque 2 intermedio: Drivers (factores explicativos)</h2>
+          <p class="mt-1 text-sm text-slate-700 md:text-base">
+            Funnel de conversion, plataformas, calidad, producto, actividad y engagement.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <article class="card p-4 md:p-6">
+            <h3 class="text-base font-bold md:text-lg">Conversion por etapas (funnel)</h3>
+            <p class="mb-3 text-sm text-slate-600">Impresiones -> clics -> leads -> ventas.</p>
+            <canvas id="chartFunnel"></canvas>
+          </article>
+
+          <article class="card p-4 md:p-6">
+            <h3 class="text-base font-bold md:text-lg">Rendimiento por plataforma</h3>
+            <p class="mb-3 text-sm text-slate-600">ROI por Instagram, TikTok y YouTube.</p>
+            <canvas id="chartRendimientoPlataforma"></canvas>
+          </article>
+
+          <article class="card p-4 md:p-6">
+            <h3 class="text-base font-bold md:text-lg">Calidad</h3>
+            <p class="mb-3 text-sm text-slate-600">Leads cualificados, attendance rate y pass rate.</p>
+            <canvas id="chartCalidad"></canvas>
+          </article>
+
+          <article class="card p-4 md:p-6">
+            <h3 class="text-base font-bold md:text-lg">Rendimiento por producto</h3>
+            <p class="mb-3 text-sm text-slate-600">Comisiones y conversion de cada producto.</p>
+            <canvas id="chartRendimientoProducto"></canvas>
+          </article>
+
+          <article class="card p-4 md:p-6">
+            <h3 class="text-base font-bold md:text-lg">Actividad por plataforma</h3>
+            <p class="mb-3 text-sm text-slate-600">Posts, stories, reels y videos publicados.</p>
+            <canvas id="chartActividad"></canvas>
+          </article>
+
+          <article class="card p-4 md:p-6">
+            <h3 class="text-base font-bold md:text-lg">Engagement por plataforma</h3>
+            <p class="mb-3 text-sm text-slate-600">Me gusta, comentarios, compartidos y guardados.</p>
+            <canvas id="chartEngagement"></canvas>
+          </article>
+        </div>
+      </section>
+
+      <section id="bloque-operacional" class="mt-8" aria-labelledby="titulo-operacional">
+        <div class="mb-4">
+          <h2 id="titulo-operacional" class="text-xl font-black md:text-2xl">Bloque 3 inferior: Detalles operacionales</h2>
+          <p class="mt-1 text-sm text-slate-700 md:text-base">
+            Tablas operativas, alertas automaticas y listados con filtros para decisiones tacticas.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4">
+          <article class="card p-4 md:p-6">
+            <h3 class="text-base font-bold md:text-lg">Tabla de productos</h3>
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <caption class="sr-only">Resumen de productos con precio, comisiones, conversiones y ROI</caption>
+                <thead class="text-left text-xs uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th scope="col" class="px-3 py-2">Producto</th>
+                    <th scope="col" class="px-3 py-2">Precio</th>
+                    <th scope="col" class="px-3 py-2">Comisiones generadas</th>
+                    <th scope="col" class="px-3 py-2">Conversiones</th>
+                    <th scope="col" class="px-3 py-2">ROI</th>
+                  </tr>
+                </thead>
+                <tbody id="tablaProductos"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="card p-4 md:p-6">
+            <h3 class="text-base font-bold md:text-lg">Tabla de plataformas</h3>
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <caption class="sr-only">Comparativa de plataformas con alcance, engagement, conversiones y metrica destacada</caption>
+                <thead class="text-left text-xs uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th scope="col" class="px-3 py-2">Plataforma</th>
+                    <th scope="col" class="px-3 py-2">Alcance</th>
+                    <th scope="col" class="px-3 py-2">Engagement</th>
+                    <th scope="col" class="px-3 py-2">Conversiones</th>
+                    <th scope="col" class="px-3 py-2">Mejor metrica</th>
+                  </tr>
+                </thead>
+                <tbody id="tablaPlataformas"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="card p-4 md:p-6">
+            <h3 class="text-base font-bold md:text-lg">Tabla de campanas</h3>
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <caption class="sr-only">Rendimiento de campanas por fecha, producto y resultados</caption>
+                <thead class="text-left text-xs uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th scope="col" class="px-3 py-2">Fecha</th>
+                    <th scope="col" class="px-3 py-2">Campana</th>
+                    <th scope="col" class="px-3 py-2">Producto</th>
+                    <th scope="col" class="px-3 py-2">Resultados</th>
+                    <th scope="col" class="px-3 py-2">Rendimiento</th>
+                  </tr>
+                </thead>
+                <tbody id="tablaCampanas"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="card p-4 md:p-6">
+            <h3 class="text-base font-bold md:text-lg">Alertas automaticas</h3>
+            <div id="panelAlertas" class="grid grid-cols-1 gap-3" aria-live="polite"></div>
+          </article>
+
+          <article class="card p-4 md:p-6">
+            <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <h3 class="text-base font-bold md:text-lg">Listados con filtros</h3>
+              <form class="flex flex-col gap-2 sm:flex-row" aria-label="Filtros de listado" onsubmit="return false;">
+                <label for="filtroListado" class="sr-only">Tipo de listado</label>
+                <select id="filtroListado" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 sm:w-auto">
+                  <option value="productos">Top productos</option>
+                  <option value="plataformas">Top plataformas</option>
+                  <option value="campanas">Top campanas</option>
+                  <option value="oportunidades">Oportunidades de mejora</option>
+                </select>
+                <label for="filtroOrden" class="sr-only">Orden del listado</label>
+                <select id="filtroOrden" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 sm:w-auto">
+                  <option value="ingresos">Orden por ingresos</option>
+                  <option value="conversion">Orden por conversion</option>
+                  <option value="roi">Orden por ROI</option>
+                  <option value="engagement">Orden por engagement</option>
+                </select>
+              </form>
+            </div>
+            <div class="mt-3 overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <caption class="sr-only">Listado dinamico segun tipo y criterio de orden</caption>
+                <thead class="text-left text-xs uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th scope="col" class="px-3 py-2">Elemento</th>
+                    <th scope="col" class="px-3 py-2">Ingreso</th>
+                    <th scope="col" class="px-3 py-2">Conversion</th>
+                    <th scope="col" class="px-3 py-2">ROI</th>
+                    <th scope="col" class="px-3 py-2">Engagement</th>
+                  </tr>
+                </thead>
+                <tbody id="tablaFiltrada"></tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="relative z-10 mt-8 border-t border-slate-900/10 bg-white/45">
+      <div class="mx-auto max-w-7xl px-4 py-5 text-xs text-slate-600 md:px-8 md:text-sm">
+        <small>© 2026 Mantoniowolf Dashboard</small>
+      </div>
+    </footer>
+
+    <script>
+      const PRECIOS = { A: 50, B: 120, C: 80 };
+      const COMISION = 0.15;
+
+      const registros = [
+        { plataforma: "Instagram", producto: "A", ventas: 220, inscripciones: 120, usuariosActivos: 3800, impresiones: 48000, alcance: 12500, clics: 1800, conversiones: 350, coste: 3200, likes: 1400, comentarios: 210, compartidos: 125, guardados: 280, tiempoPromedioHoras: 9.2, churn: 0.05, permanenciaMeses: 8.2, completion: 0.79, nps: 58, csat: 86, leads: 680, leadsCualificados: 442, attendance: 0.86, pass: 0.72, posts: 12, stories: 23, reels: 11, videos: 7 },
+        { plataforma: "Instagram", producto: "B", ventas: 110, inscripciones: 82, usuariosActivos: 2500, impresiones: 36000, alcance: 9600, clics: 1300, conversiones: 170, coste: 2800, likes: 1260, comentarios: 190, compartidos: 90, guardados: 240, tiempoPromedioHoras: 8.5, churn: 0.07, permanenciaMeses: 6.9, completion: 0.73, nps: 50, csat: 82, leads: 490, leadsCualificados: 294, attendance: 0.8, pass: 0.66, posts: 9, stories: 20, reels: 10, videos: 5 },
+        { plataforma: "Instagram", producto: "C", ventas: 150, inscripciones: 98, usuariosActivos: 3000, impresiones: 39000, alcance: 8400, clics: 1460, conversiones: 220, coste: 2100, likes: 1150, comentarios: 175, compartidos: 88, guardados: 220, tiempoPromedioHoras: 8.8, churn: 0.06, permanenciaMeses: 7.5, completion: 0.76, nps: 53, csat: 84, leads: 520, leadsCualificados: 338, attendance: 0.82, pass: 0.69, posts: 10, stories: 18, reels: 9, videos: 6 },
+        { plataforma: "TikTok", producto: "A", ventas: 260, inscripciones: 148, usuariosActivos: 4700, impresiones: 62000, alcance: 18000, clics: 2400, conversiones: 420, coste: 3500, likes: 2300, comentarios: 310, compartidos: 260, guardados: 340, tiempoPromedioHoras: 7.6, churn: 0.04, permanenciaMeses: 9.1, completion: 0.83, nps: 62, csat: 89, leads: 840, leadsCualificados: 596, attendance: 0.9, pass: 0.77, posts: 14, stories: 10, reels: 19, videos: 13 },
+        { plataforma: "TikTok", producto: "B", ventas: 150, inscripciones: 90, usuariosActivos: 3200, impresiones: 51000, alcance: 15200, clics: 1880, conversiones: 250, coste: 3300, likes: 1960, comentarios: 260, compartidos: 210, guardados: 290, tiempoPromedioHoras: 7.3, churn: 0.06, permanenciaMeses: 7.2, completion: 0.74, nps: 54, csat: 83, leads: 640, leadsCualificados: 390, attendance: 0.83, pass: 0.68, posts: 12, stories: 9, reels: 16, videos: 11 },
+        { plataforma: "TikTok", producto: "C", ventas: 190, inscripciones: 106, usuariosActivos: 3600, impresiones: 54000, alcance: 14600, clics: 2100, conversiones: 310, coste: 2900, likes: 2050, comentarios: 278, compartidos: 195, guardados: 310, tiempoPromedioHoras: 7.8, churn: 0.05, permanenciaMeses: 8.1, completion: 0.78, nps: 57, csat: 86, leads: 710, leadsCualificados: 447, attendance: 0.85, pass: 0.71, posts: 13, stories: 9, reels: 17, videos: 12 },
+        { plataforma: "YouTube", producto: "A", ventas: 180, inscripciones: 108, usuariosActivos: 3000, impresiones: 41000, alcance: 10200, clics: 1500, conversiones: 260, coste: 2500, likes: 980, comentarios: 132, compartidos: 74, guardados: 180, tiempoPromedioHoras: 10.1, churn: 0.05, permanenciaMeses: 8.8, completion: 0.8, nps: 59, csat: 87, leads: 530, leadsCualificados: 360, attendance: 0.88, pass: 0.74, posts: 6, stories: 3, reels: 2, videos: 16 },
+        { plataforma: "YouTube", producto: "B", ventas: 140, inscripciones: 84, usuariosActivos: 2400, impresiones: 34000, alcance: 9300, clics: 1240, conversiones: 210, coste: 2700, likes: 890, comentarios: 120, compartidos: 68, guardados: 160, tiempoPromedioHoras: 9.4, churn: 0.07, permanenciaMeses: 6.7, completion: 0.71, nps: 48, csat: 80, leads: 460, leadsCualificados: 262, attendance: 0.79, pass: 0.64, posts: 5, stories: 2, reels: 2, videos: 14 },
+        { plataforma: "YouTube", producto: "C", ventas: 130, inscripciones: 75, usuariosActivos: 2100, impresiones: 30000, alcance: 8100, clics: 1100, conversiones: 180, coste: 2200, likes: 760, comentarios: 112, compartidos: 60, guardados: 142, tiempoPromedioHoras: 9.7, churn: 0.06, permanenciaMeses: 7.4, completion: 0.75, nps: 52, csat: 83, leads: 410, leadsCualificados: 262, attendance: 0.82, pass: 0.67, posts: 4, stories: 2, reels: 1, videos: 12 },
+      ];
+
+      const campanas = [
+        { fecha: "2026-05-02", nombre: "Spring Boost", plataforma: "Instagram", producto: "A", ventas: 90, conversiones: 140, alcance: 5300, coste: 1100 },
+        { fecha: "2026-05-10", nombre: "Creators Wave", plataforma: "TikTok", producto: "A", ventas: 120, conversiones: 190, alcance: 7600, coste: 1400 },
+        { fecha: "2026-05-17", nombre: "Tutorial DeepDive", plataforma: "YouTube", producto: "B", ventas: 74, conversiones: 102, alcance: 4300, coste: 1200 },
+        { fecha: "2026-05-25", nombre: "Promo Intensiva", plataforma: "TikTok", producto: "C", ventas: 108, conversiones: 168, alcance: 6800, coste: 1180 },
+        { fecha: "2026-06-01", nombre: "Deal Weekend", plataforma: "Instagram", producto: "B", ventas: 68, conversiones: 94, alcance: 3600, coste: 980 },
+        { fecha: "2026-06-08", nombre: "Launch Vertical", plataforma: "YouTube", producto: "A", ventas: 82, conversiones: 120, alcance: 4700, coste: 990 },
+      ];
+
+      const eur = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+      const num = new Intl.NumberFormat("es-ES");
+      const pct = (v) => `${(v * 100).toFixed(2)}%`;
+      const avg = (arr) => arr.reduce((a, b) => a + b, 0) / (arr.length || 1);
+      const KPI_CARD_CLASS = "kpi-card card p-4";
+      const TABLE_ROW_CLASS = "border-b border-slate-200/70";
+      const TD_CLASS = "px-3 py-2 text-slate-600";
+      const TD_STRONG_CLASS = "px-3 py-2 font-semibold text-slate-700";
+
+      const totals = registros.reduce(
+        (acc, r) => {
+          const ingreso = r.ventas * PRECIOS[r.producto];
+          const interacciones = r.likes + r.comentarios + r.compartidos + r.guardados;
+          acc.ventas += r.ventas;
+          acc.inscripciones += r.inscripciones;
+          acc.usuariosActivos += r.usuariosActivos;
+          acc.impresiones += r.impresiones;
+          acc.ingresos += ingreso;
+          acc.comisiones += ingreso * COMISION;
+          acc.alcance += r.alcance;
+          acc.clics += r.clics;
+          acc.conversiones += r.conversiones;
+          acc.interacciones += interacciones;
+          acc.costes += r.coste;
+          acc.churn += r.churn;
+          acc.permanencia += r.permanenciaMeses;
+          acc.completion += r.completion;
+          acc.nps += r.nps;
+          acc.csat += r.csat;
+          acc.leads += r.leads;
+          acc.leadsCualificados += r.leadsCualificados;
+          acc.attendance += r.attendance;
+          acc.pass += r.pass;
+          acc.tiempos += r.tiempoPromedioHoras;
+          return acc;
+        },
+        {
+          ventas: 0,
+          inscripciones: 0,
+          usuariosActivos: 0,
+          impresiones: 0,
+          ingresos: 0,
+          comisiones: 0,
+          alcance: 0,
+          clics: 0,
+          conversiones: 0,
+          interacciones: 0,
+          costes: 0,
+          churn: 0,
+          permanencia: 0,
+          completion: 0,
+          nps: 0,
+          csat: 0,
+          leads: 0,
+          leadsCualificados: 0,
+          attendance: 0,
+          pass: 0,
+          tiempos: 0,
+        },
+      );
+
+      const mrr = totals.inscripciones * 32;
+      const precioMedio = totals.ingresos / totals.ventas;
+      const engagementRate = totals.interacciones / totals.alcance;
+      const conversionRate = totals.conversiones / totals.alcance;
+      const ctr = totals.clics / totals.impresiones;
+      const churn = totals.churn / registros.length;
+      const permanencia = totals.permanencia / registros.length;
+      const completion = totals.completion / registros.length;
+      const nps = totals.nps / registros.length;
+      const csat = totals.csat / registros.length;
+      const costeResultado = totals.costes / totals.conversiones;
+      const margen = (totals.ingresos - totals.costes) / totals.ingresos;
+      const tiempoMedio = totals.tiempos / registros.length;
+      const ratioLeads = totals.leadsCualificados / totals.leads;
+      const attendanceRate = totals.attendance / registros.length;
+      const passRate = totals.pass / registros.length;
+
+      const kpis = [
+        { grupo: "Volumen", nombre: "Ventas", valor: num.format(totals.ventas), detalle: "Unidades vendidas" },
+        { grupo: "Volumen", nombre: "Inscripciones", valor: num.format(totals.inscripciones), detalle: "Nuevas suscripciones" },
+        { grupo: "Volumen", nombre: "Usuarios activos", valor: num.format(totals.usuariosActivos), detalle: "Suma mensual" },
+        { grupo: "Volumen", nombre: "Impresiones", valor: num.format(totals.impresiones), detalle: "Exposicion total" },
+        { grupo: "Ingresos", nombre: "Revenue", valor: eur.format(totals.ingresos), detalle: "Ventas de productos" },
+        { grupo: "Ingresos", nombre: "Comisiones", valor: eur.format(totals.comisiones), detalle: "15% del revenue" },
+        { grupo: "Ingresos", nombre: "MRR", valor: eur.format(mrr), detalle: "Suscripciones recurrentes" },
+        { grupo: "Ingresos", nombre: "Precio medio", valor: eur.format(precioMedio), detalle: "Ticket promedio" },
+        { grupo: "Engagement", nombre: "Engagement rate", valor: pct(engagementRate), detalle: "Interacciones / alcance" },
+        { grupo: "Engagement", nombre: "Interacciones", valor: num.format(totals.interacciones), detalle: "Likes + comentarios + compartidos + guardados" },
+        { grupo: "Engagement", nombre: "Conversion", valor: pct(conversionRate), detalle: "Conversiones / alcance" },
+        { grupo: "Retencion", nombre: "Churn", valor: pct(churn), detalle: "Tasa de bajas" },
+        { grupo: "Retencion", nombre: "Permanencia", valor: `${permanencia.toFixed(1)} meses`, detalle: "Duracion media" },
+        { grupo: "Retencion", nombre: "Completion", valor: pct(completion), detalle: "Proceso completado" },
+        { grupo: "Rendimiento", nombre: "Conversiones", valor: num.format(totals.conversiones), detalle: "Resultados totales" },
+        { grupo: "Rendimiento", nombre: "CTR", valor: pct(ctr), detalle: "Clics / impresiones" },
+        { grupo: "Rendimiento", nombre: "Tasa conversion", valor: pct(conversionRate), detalle: "Conversiones / alcance" },
+        { grupo: "Satisfaccion", nombre: "NPS", valor: nps.toFixed(0), detalle: "Lealtad de clientes" },
+        { grupo: "Satisfaccion", nombre: "CSAT", valor: `${csat.toFixed(0)}/100`, detalle: "Satisfaccion" },
+        { grupo: "Eficiencia", nombre: "Coste resultado", valor: eur.format(costeResultado), detalle: "Coste por conversion" },
+        { grupo: "Eficiencia", nombre: "Margen", valor: pct(margen), detalle: "(Ingresos-costes) / ingresos" },
+        { grupo: "Eficiencia", nombre: "Tiempo medio", valor: `${tiempoMedio.toFixed(1)} h`, detalle: "Tiempo por gestion" },
+      ];
+
+      const kpiGrid = document.getElementById("kpiGrid");
+      kpis.forEach((kpi) => {
+        const card = document.createElement("article");
+        card.className = KPI_CARD_CLASS;
+        card.innerHTML = `
+          <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">${kpi.grupo}</p>
+          <h3 class="mt-1 text-sm font-semibold text-slate-700">${kpi.nombre}</h3>
+          <p class="mt-2 text-2xl font-extrabold text-slate-900">${kpi.valor}</p>
+          <p class="mt-1 text-xs text-slate-500">${kpi.detalle}</p>
+        `;
+        kpiGrid.appendChild(card);
+      });
+
+      const plataformas = [...new Set(registros.map((r) => r.plataforma))];
+      const productos = [...new Set(registros.map((r) => r.producto))];
+
+      const porPlataforma = plataformas.map((plataforma) => {
+        const filas = registros.filter((r) => r.plataforma === plataforma);
+        const ingreso = filas.reduce((s, r) => s + r.ventas * PRECIOS[r.producto], 0);
+        const coste = filas.reduce((s, r) => s + r.coste, 0);
+        const alcance = filas.reduce((s, r) => s + r.alcance, 0);
+        const conversiones = filas.reduce((s, r) => s + r.conversiones, 0);
+        const interacciones = filas.reduce((s, r) => s + r.likes + r.comentarios + r.compartidos + r.guardados, 0);
+        const engagement = interacciones / alcance;
+        const roi = ingreso / coste;
+        const conversion = conversiones / alcance;
+        return { plataforma, ingreso, coste, alcance, conversiones, engagement, roi, conversion };
+      });
+
+      const porProducto = productos.map((producto) => {
+        const filas = registros.filter((r) => r.producto === producto);
+        const ingreso = filas.reduce((s, r) => s + r.ventas * PRECIOS[producto], 0);
+        const coste = filas.reduce((s, r) => s + r.coste, 0);
+        const alcance = filas.reduce((s, r) => s + r.alcance, 0);
+        const conversiones = filas.reduce((s, r) => s + r.conversiones, 0);
+        const interacciones = filas.reduce((s, r) => s + r.likes + r.comentarios + r.compartidos + r.guardados, 0);
+        return {
+          producto,
+          ingreso,
+          comision: ingreso * COMISION,
+          conversiones,
+          roi: ingreso / coste,
+          conversion: conversiones / alcance,
+          engagement: interacciones / alcance,
+        };
+      });
+
+      const funnel = [
+        totals.impresiones,
+        totals.clics,
+        totals.leads,
+        totals.conversiones,
+      ];
+
+      const activityByPlatform = plataformas.map((p) => {
+        const rows = registros.filter((r) => r.plataforma === p);
+        return {
+          plataforma: p,
+          posts: rows.reduce((s, r) => s + r.posts, 0),
+          stories: rows.reduce((s, r) => s + r.stories, 0),
+          reels: rows.reduce((s, r) => s + r.reels, 0),
+          videos: rows.reduce((s, r) => s + r.videos, 0),
+        };
+      });
+
+      const engagementByPlatform = plataformas.map((p) => {
+        const rows = registros.filter((r) => r.plataforma === p);
+        return {
+          plataforma: p,
+          likes: rows.reduce((s, r) => s + r.likes, 0),
+          comentarios: rows.reduce((s, r) => s + r.comentarios, 0),
+          compartidos: rows.reduce((s, r) => s + r.compartidos, 0),
+          guardados: rows.reduce((s, r) => s + r.guardados, 0),
+        };
+      });
+
+      const chartDefaults = {
+        plugins: {
+          legend: {
+            labels: { color: "#334155", font: { size: 12, weight: "600" } },
+          },
+        },
+        scales: {
+          x: {
+            ticks: { color: "#475569", font: { weight: "600" } },
+            grid: { color: "rgba(71,85,105,0.12)" },
+          },
+          y: {
+            ticks: { color: "#475569" },
+            grid: { color: "rgba(71,85,105,0.12)" },
+          },
+        },
+      };
+
+      new Chart(document.getElementById("chartFunnel"), {
+        type: "bar",
+        data: {
+          labels: ["Impresiones", "Clics", "Leads", "Ventas"],
+          datasets: [{ label: "Funnel", data: funnel, backgroundColor: ["#93c5fd", "#60a5fa", "#2563eb", "#1d4ed8"], borderRadius: 10 }],
+        },
+        options: {
+          ...chartDefaults,
+          plugins: {
+            ...chartDefaults.plugins,
+            tooltip: { callbacks: { label: (c) => num.format(c.raw) } },
+          },
+        },
+      });
+
+      new Chart(document.getElementById("chartRendimientoPlataforma"), {
+        type: "line",
+        data: {
+          labels: plataformas,
+          datasets: [{ label: "ROI", data: porPlataforma.map((p) => p.roi), borderColor: "#0e7490", backgroundColor: "rgba(14,116,144,0.15)", fill: true, tension: 0.25, pointRadius: 5 }],
+        },
+        options: {
+          ...chartDefaults,
+          plugins: {
+            ...chartDefaults.plugins,
+            tooltip: { callbacks: { label: (c) => `ROI ${c.raw.toFixed(2)}x` } },
+          },
+        },
+      });
+
+      new Chart(document.getElementById("chartCalidad"), {
+        type: "bar",
+        data: {
+          labels: ["Lead qual. ratio", "Attendance rate", "Pass rate"],
+          datasets: [{ label: "Calidad", data: [ratioLeads, attendanceRate, passRate], backgroundColor: ["#f59e0b", "#84cc16", "#10b981"], borderRadius: 10 }],
+        },
+        options: {
+          ...chartDefaults,
+          scales: {
+            ...chartDefaults.scales,
+            y: {
+              ...chartDefaults.scales.y,
+              ticks: { color: "#475569", callback: (v) => `${(v * 100).toFixed(0)}%` },
+            },
+          },
+          plugins: {
+            ...chartDefaults.plugins,
+            tooltip: { callbacks: { label: (c) => pct(c.raw) } },
+          },
+        },
+      });
+
+      new Chart(document.getElementById("chartRendimientoProducto"), {
+        type: "bar",
+        data: {
+          labels: productos,
+          datasets: [
+            { label: "Comisiones EUR", data: porProducto.map((p) => p.comision), backgroundColor: "#22c55e", borderRadius: 8 },
+            { label: "Conversion", data: porProducto.map((p) => p.conversion * 100), backgroundColor: "#0ea5e9", borderRadius: 8 },
+          ],
+        },
+        options: {
+          ...chartDefaults,
+          plugins: {
+            ...chartDefaults.plugins,
+            tooltip: {
+              callbacks: {
+                label: (c) =>
+                  c.dataset.label.includes("EUR")
+                    ? `${c.dataset.label}: ${eur.format(c.raw)}`
+                    : `${c.dataset.label}: ${c.raw.toFixed(2)}%`,
+              },
+            },
+          },
+        },
+      });
+
+      new Chart(document.getElementById("chartActividad"), {
+        type: "bar",
+        data: {
+          labels: plataformas,
+          datasets: [
+            { label: "Posts", data: activityByPlatform.map((p) => p.posts), backgroundColor: "#fb7185", borderRadius: 7 },
+            { label: "Stories", data: activityByPlatform.map((p) => p.stories), backgroundColor: "#f59e0b", borderRadius: 7 },
+            { label: "Reels", data: activityByPlatform.map((p) => p.reels), backgroundColor: "#a855f7", borderRadius: 7 },
+            { label: "Videos", data: activityByPlatform.map((p) => p.videos), backgroundColor: "#0ea5e9", borderRadius: 7 },
+          ],
+        },
+        options: chartDefaults,
+      });
+
+      new Chart(document.getElementById("chartEngagement"), {
+        type: "bar",
+        data: {
+          labels: plataformas,
+          datasets: [
+            { label: "Likes", data: engagementByPlatform.map((p) => p.likes), backgroundColor: "#16a34a", borderRadius: 7 },
+            { label: "Comentarios", data: engagementByPlatform.map((p) => p.comentarios), backgroundColor: "#0ea5e9", borderRadius: 7 },
+            { label: "Compartidos", data: engagementByPlatform.map((p) => p.compartidos), backgroundColor: "#f97316", borderRadius: 7 },
+            { label: "Guardados", data: engagementByPlatform.map((p) => p.guardados), backgroundColor: "#8b5cf6", borderRadius: 7 },
+          ],
+        },
+        options: chartDefaults,
+      });
+
+      const tablaProductos = document.getElementById("tablaProductos");
+      porProducto.forEach((p) => {
+        const tr = document.createElement("tr");
+        tr.className = TABLE_ROW_CLASS;
+        tr.innerHTML = `
+          <td class="${TD_STRONG_CLASS}">${p.producto}</td>
+          <td class="${TD_CLASS}">${eur.format(PRECIOS[p.producto])}</td>
+          <td class="${TD_CLASS}">${eur.format(p.comision)}</td>
+          <td class="${TD_CLASS}">${num.format(p.conversiones)}</td>
+          <td class="${TD_CLASS}">${p.roi.toFixed(2)}x</td>
+        `;
+        tablaProductos.appendChild(tr);
+      });
+
+      const maxAlcance = Math.max(...porPlataforma.map((p) => p.alcance));
+      const maxEng = Math.max(...porPlataforma.map((p) => p.engagement));
+      const maxConv = Math.max(...porPlataforma.map((p) => p.conversion));
+
+      const tablaPlataformas = document.getElementById("tablaPlataformas");
+      porPlataforma.forEach((p) => {
+        const top = [];
+        if (p.alcance === maxAlcance) top.push("Alcance");
+        if (p.engagement === maxEng) top.push("Engagement");
+        if (p.conversion === maxConv) top.push("Conversion");
+
+        const tr = document.createElement("tr");
+        tr.className = TABLE_ROW_CLASS;
+        tr.innerHTML = `
+          <td class="${TD_STRONG_CLASS}">${p.plataforma}</td>
+          <td class="${TD_CLASS}">${num.format(p.alcance)}</td>
+          <td class="${TD_CLASS}">${pct(p.engagement)}</td>
+          <td class="${TD_CLASS}">${num.format(p.conversiones)}</td>
+          <td class="${TD_CLASS}">${top.join(" / ") || "-"}</td>
+        `;
+        tablaPlataformas.appendChild(tr);
+      });
+
+      const tablaCampanas = document.getElementById("tablaCampanas");
+      campanas.forEach((c) => {
+        const ingreso = c.ventas * PRECIOS[c.producto];
+        const roi = ingreso / c.coste;
+        const tr = document.createElement("tr");
+        tr.className = TABLE_ROW_CLASS;
+        tr.innerHTML = `
+          <td class="${TD_CLASS}">${c.fecha}</td>
+          <td class="${TD_STRONG_CLASS}">${c.nombre} (${c.plataforma})</td>
+          <td class="${TD_CLASS}">${c.producto}</td>
+          <td class="${TD_CLASS}">${num.format(c.ventas)} ventas / ${num.format(c.conversiones)} conv.</td>
+          <td class="${TD_CLASS}">ROI ${roi.toFixed(2)}x</td>
+        `;
+        tablaCampanas.appendChild(tr);
+      });
+
+      const panelAlertas = document.getElementById("panelAlertas");
+      const alertas = [];
+
+      porPlataforma.forEach((p) => {
+        if (p.conversion < 0.02) {
+          alertas.push({
+            tipo: "alert-high",
+            titulo: `Caida fuerte en conversion - ${p.plataforma}`,
+            detalle: `La conversion esta en ${pct(p.conversion)}. Revisar segmentacion, creatividad y landing.`,
+          });
+        }
+        if (p.conversion > 0.025) {
+          alertas.push({
+            tipo: "alert-positive",
+            titulo: `Pico de conversion - ${p.plataforma}`,
+            detalle: `La conversion subio a ${pct(p.conversion)}. Escalar presupuesto y replicar formato.`,
+          });
+        }
+        if (p.roi < 2) {
+          alertas.push({
+            tipo: "alert-medium",
+            titulo: `Anomalia de rendimiento - ${p.plataforma}`,
+            detalle: `ROI ${p.roi.toFixed(2)}x por debajo del objetivo 2.00x.`,
+          });
+        }
+      });
+
+      if (!alertas.length) {
+        alertas.push({ tipo: "alert-positive", titulo: "Sin alertas criticas", detalle: "No hay desviaciones severas en conversion ni ROI." });
+      }
+
+      alertas.forEach((a) => {
+        const box = document.createElement("div");
+        box.className = `rounded-xl border p-3 ${a.tipo}`;
+        box.innerHTML = `
+          <h4 class="text-sm font-bold text-slate-800">${a.titulo}</h4>
+          <p class="mt-1 text-sm text-slate-700">${a.detalle}</p>
+        `;
+        panelAlertas.appendChild(box);
+      });
+
+      const tablaFiltrada = document.getElementById("tablaFiltrada");
+      const filtroListado = document.getElementById("filtroListado");
+      const filtroOrden = document.getElementById("filtroOrden");
+
+      const sortBy = (items, key) => [...items].sort((a, b) => (b[key] || 0) - (a[key] || 0));
+
+      const dataTopProductos = porProducto.map((p) => ({
+        elemento: `Producto ${p.producto}`,
+        ingresos: p.ingreso,
+        conversion: p.conversion,
+        roi: p.roi,
+        engagement: p.engagement,
+      }));
+
+      const dataTopPlataformas = porPlataforma.map((p) => ({
+        elemento: p.plataforma,
+        ingresos: p.ingreso,
+        conversion: p.conversion,
+        roi: p.roi,
+        engagement: p.engagement,
+      }));
+
+      const dataTopCampanas = campanas.map((c) => {
+        const ingresos = c.ventas * PRECIOS[c.producto];
+        return {
+          elemento: c.nombre,
+          ingresos,
+          conversion: c.conversiones / c.alcance,
+          roi: ingresos / c.coste,
+          engagement: avg(
+            registros
+              .filter((r) => r.plataforma === c.plataforma && r.producto === c.producto)
+              .map((r) => (r.likes + r.comentarios + r.compartidos + r.guardados) / r.alcance),
+          ),
+        };
+      });
+
+      const oportunidades = [];
+      porProducto.forEach((p) => {
+        if (p.conversion < conversionRate) {
+          oportunidades.push({
+            elemento: `Mejorar funnel Producto ${p.producto}`,
+            ingresos: p.ingreso,
+            conversion: p.conversion,
+            roi: p.roi,
+            engagement: p.engagement,
+          });
+        }
+      });
+      porPlataforma.forEach((p) => {
+        if (p.roi < 2.2) {
+          oportunidades.push({
+            elemento: `Optimizar coste en ${p.plataforma}`,
+            ingresos: p.ingreso,
+            conversion: p.conversion,
+            roi: p.roi,
+            engagement: p.engagement,
+          });
+        }
+      });
+
+      function pintarTablaFiltrada() {
+        const tipo = filtroListado.value;
+        const orden = filtroOrden.value;
+        let data;
+        if (tipo === "productos") data = dataTopProductos;
+        if (tipo === "plataformas") data = dataTopPlataformas;
+        if (tipo === "campanas") data = dataTopCampanas;
+        if (tipo === "oportunidades") data = oportunidades.length ? oportunidades : dataTopProductos;
+        const sorted = sortBy(data, orden);
+
+        tablaFiltrada.innerHTML = "";
+        sorted.forEach((row) => {
+          const tr = document.createElement("tr");
+          tr.className = TABLE_ROW_CLASS;
+          tr.innerHTML = `
+            <td class="${TD_STRONG_CLASS}">${row.elemento}</td>
+            <td class="${TD_CLASS}">${eur.format(row.ingresos)}</td>
+            <td class="${TD_CLASS}">${pct(row.conversion)}</td>
+            <td class="${TD_CLASS}">${row.roi.toFixed(2)}x</td>
+            <td class="${TD_CLASS}">${pct(row.engagement)}</td>
+          `;
+          tablaFiltrada.appendChild(tr);
+        });
+      }
+
+      filtroListado.addEventListener("change", pintarTablaFiltrada);
+      filtroOrden.addEventListener("change", pintarTablaFiltrada);
+      pintarTablaFiltrada();
+    </script>
+  </body>
+</html>
